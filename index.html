@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Task Dependency Planner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #171717;
+      --sidebar: #202020;
+      --card: #232323;
+      --input: #121212;
+      --border: #323232;
+      --text: #f9fafb;
+      --muted: #d1d5db;
+      --subtle: #9ca3af;
+      --header-sub: #bdbdbd;
+      --blue: #2563eb;
+      --purple: #7c3aed;
+      --orange: #f97316;
+      --red: #ef4444;
+      --green: #16a34a;
+      --edge: #f59e0b;
+      --node: #60a5fa;
+    }
+
+    body.light {
+      --bg: #f5f5f5;
+      --sidebar: #e5e7eb;
+      --card: #ffffff;
+      --input: #f9fafb;
+      --border: #d1d5db;
+      --text: #111827;
+      --muted: #374151;
+      --subtle: #4b5563;
+      --header-sub: #4b5563;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: var(--sidebar);
+      padding: 28px 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .sidebar-title {
+      font-size: 30px;
+      font-weight: bold;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .sidebar-footer {
+      font-size: 13px;
+      color: var(--subtle);
+      line-height: 1.7;
+    }
+
+    .mode-section {
+      margin-top: 24px;
+    }
+
+    .mode-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+      font-weight: bold;
+    }
+
+    .mode-select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: #2f2f2f;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    body.light .mode-select {
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+
+    .main {
+      flex: 1;
+      padding: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 22px;
+    }
+
+    .header { margin-bottom: 16px; }
+
+    .header h2 {
+      font-size: 30px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 16px;
+      color: var(--header-sub);
+    }
+
+    .input-row,
+    .stats-row,
+    .bottom-row {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .input-row { grid-template-columns: 1fr 1fr; }
+    .stats-row { grid-template-columns: repeat(3, 1fr); }
+    .bottom-row { grid-template-columns: 1fr 1fr; }
+
+    .input-card h3,
+    .output-panel h3,
+    .right-panel h3,
+    .graph-section h3 {
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+
+    .input-card input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      margin-bottom: 12px;
+      background: var(--input);
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    body.light .input-card input {
+      border: 1px solid var(--border);
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--header-sub);
+      margin-bottom: 14px;
+    }
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .stat-title {
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: bold;
+    }
+
+    .textbox {
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 260px;
+      white-space: pre-line;
+      line-height: 1.6;
+      font-family: Consolas, monospace;
+      overflow-y: auto;
+    }
+
+    .small-box {
+      min-height: 170px;
+      margin-bottom: 18px;
+    }
+
+    .sub-panel:last-child .small-box {
+      margin-bottom: 0;
+    }
+
+    .graph-section {
+      margin-bottom: 16px;
+    }
+
+    .graph-container {
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      min-height: 340px;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .graph-placeholder {
+      color: var(--subtle);
+      font-family: Consolas, monospace;
+      padding: 18px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: 0.2s ease;
+    }
+
+    .btn:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-blue { background: var(--blue); }
+    .btn-purple { background: var(--purple); }
+    .btn-orange { background: var(--orange); }
+    .btn-red { background: var(--red); }
+    .btn-green { background: var(--green); }
+
+    svg {
+      width: 100%;
+      min-width: 900px;
+      height: 420px;
+    }
+
+    .node-circle {
+      fill: var(--node);
+      stroke: #1e3a8a;
+      stroke-width: 2;
+    }
+
+    .node-text {
+      fill: white;
+      font-size: 12px;
+      font-weight: bold;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .edge-line {
+      stroke: var(--edge);
+      stroke-width: 2.5;
+      fill: none;
+      marker-end: url(#arrowhead);
+    }
+
+    body.light .node-text {
+      fill: #111827;
+    }
+
+    @media (max-width: 1100px) {
+      .input-row, .stats-row, .bottom-row { grid-template-columns: 1fr; }
+      .app { flex-direction: column; }
+      .sidebar { width: 100%; }
+      svg { min-width: 700px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div>
+        <h1 class="sidebar-title">AI Task<br>Planner</h1>
+        <p class="sidebar-subtitle">
+          Discrete Mathematics<br>
+          Application using<br>
+          Directed Graphs
+        </p>
+
+        <button class="btn btn-blue" id="loadSampleBtn">Load Sample Data</button>
+        <button class="btn btn-purple" id="generatePlanBtn">Generate Plan</button>
+        <button class="btn btn-orange" id="visualizeGraphBtn">Visualize Graph</button>
+        <button class="btn btn-red" id="clearAllBtn">Clear All</button>
+
+        <div class="mode-section">
+          <label class="mode-label">Appearance Mode</label>
+          <select class="mode-select" id="modeSelect">
+            <option value="dark" selected>Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        Topological Sorting<br>
+        Cycle Detection<br>
+        DAG Validation
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="header card">
+        <h2>Task Dependency Planner Dashboard</h2>
+        <p>Build task flows like "Design → Development → Testing → Deployment"</p>
+      </section>
+
+      <section class="input-row">
+        <div class="card input-card">
+          <h3>Add Task</h3>
+          <input type="text" id="taskInput" placeholder="Enter task name">
+          <button class="btn btn-blue" id="addTaskBtn">Add Task</button>
+        </div>
+
+        <div class="card input-card">
+          <h3>Add Dependency</h3>
+          <input type="text" id="fromTaskInput" placeholder="From task">
+          <input type="text" id="toTaskInput" placeholder="To task">
+          <p class="note">Meaning: "A → B" means A must be completed before B</p>
+          <button class="btn btn-green" id="addDependencyBtn">Add Dependency</button>
+        </div>
+      </section>
+
+      <section class="stats-row">
+        <div class="card stat-card">
+          <span class="stat-title">Total Tasks</span>
+          <span class="stat-value" id="taskCount">0</span>
+        </div>
+        <div class="card stat-card">
+          <span class="stat-title">Dependencies</span>
+          <span class="stat-value" id="dependencyCount">0</span>
+        </div>
+        <div class="card stat-card">
+          <span class="stat-title">Status</span>
+          <span class="stat-value" id="statusText">Ready</span>
+        </div>
+      </section>
+
+      <section class="bottom-row">
+        <div class="card output-panel">
+          <h3>Planner Output</h3>
+          <div class="textbox" id="outputBox">Application ready.</div>
+        </div>
+
+        <div class="card right-panel">
+          <div class="sub-panel">
+            <h3>Task List</h3>
+            <div class="textbox small-box" id="taskListBox">No tasks added yet.</div>
+          </div>
+
+          <div class="sub-panel">
+            <h3>Dependency List</h3>
+            <div class="textbox small-box" id="dependencyListBox">No dependencies added yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card graph-section">
+        <h3>Graph Visualization</h3>
+        <div id="graphContainer" class="graph-container">
+          <div class="graph-placeholder">Click "Visualize Graph" to display the dependency graph.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const tasks = new Set();
+    const dependencies = [];
+
+    const taskInput = document.getElementById("taskInput");
+    const fromTaskInput = document.getElementById("fromTaskInput");
+    const toTaskInput = document.getElementById("toTaskInput");
+
+    const outputBox = document.getElementById("outputBox");
+    const taskListBox = document.getElementById("taskListBox");
+    const dependencyListBox = document.getElementById("dependencyListBox");
+
+    const taskCount = document.getElementById("taskCount");
+    const dependencyCount = document.getElementById("dependencyCount");
+    const statusText = document.getElementById("statusText");
+    const graphContainer = document.getElementById("graphContainer");
+    const modeSelect = document.getElementById("modeSelect");
+
+    document.getElementById("addTaskBtn").addEventListener("click", addTask);
+    document.getElementById("addDependencyBtn").addEventListener("click", addDependency);
+    document.getElementById("generatePlanBtn").addEventListener("click", generatePlan);
+    document.getElementById("clearAllBtn").addEventListener("click", clearAll);
+    document.getElementById("loadSampleBtn").addEventListener("click", loadSampleData);
+    document.getElementById("visualizeGraphBtn").addEventListener("click", visualizeGraph);
+    modeSelect.addEventListener("change", changeAppearanceMode);
+
+    taskInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addTask();
+    });
+
+    toTaskInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addDependency();
+    });
+
+    function logOutput(text, append = true) {
+      if (append) {
+        outputBox.textContent += (outputBox.textContent ? "\n" : "") + text;
+      } else {
+        outputBox.textContent = text;
+      }
+      outputBox.scrollTop = outputBox.scrollHeight;
+    }
+
+    function setStatus(text) {
+      statusText.textContent = text;
+    }
+
+    function updateStatsAndLists() {
+      taskCount.textContent = String(tasks.size);
+      dependencyCount.textContent = String(dependencies.length);
+
+      if (tasks.size === 0) {
+        taskListBox.textContent = "No tasks added yet.";
+      } else {
+        taskListBox.textContent = Array.from(tasks)
+          .sort((a, b) => a.localeCompare(b))
+          .map((task, i) => `${i + 1}. ${task}`)
+          .join("\n");
+      }
+
+      if (dependencies.length === 0) {
+        dependencyListBox.textContent = "No dependencies added yet.";
+      } else {
+        dependencyListBox.textContent = dependencies
+          .map(([a, b], i) => `${i + 1}. ${a} → ${b}`)
+          .join("\n");
+      }
+    }
+
+    function addTask() {
+      const task = taskInput.value.trim();
+
+      if (!task) {
+        alert("Please enter a task name.");
+        return;
+      }
+
+      if (tasks.has(task)) {
+        alert(`Task "${task}" already exists.`);
+        return;
+      }
+
+      tasks.add(task);
+      taskInput.value = "";
+      logOutput(`✓ Task added: ${task}`);
+      setStatus("Updated");
+      updateStatsAndLists();
+    }
+
+    function addDependency() {
+      const fromTask = fromTaskInput.value.trim();
+      const toTask = toTaskInput.value.trim();
+
+      if (!fromTask || !toTask) {
+        alert("Please enter both tasks.");
+        return;
+      }
+
+      if (fromTask === toTask) {
+        alert("A task cannot depend on itself.");
+        return;
+      }
+
+      const exists = dependencies.some(([a, b]) => a === fromTask && b === toTask);
+      if (exists) {
+        alert("This dependency already exists.");
+        return;
+      }
+
+      if (!tasks.has(fromTask)) {
+        tasks.add(fromTask);
+        logOutput(`✓ Auto-added task: ${fromTask}`);
+      }
+
+      if (!tasks.has(toTask)) {
+        tasks.add(toTask);
+        logOutput(`✓ Auto-added task: ${toTask}`);
+      }
+
+      dependencies.push([fromTask, toTask]);
+      fromTaskInput.value = "";
+      toTaskInput.value = "";
+
+      logOutput(`✓ Dependency added: ${fromTask} → ${toTask}`);
+      setStatus("Updated");
+      updateStatsAndLists();
+    }
+
+    function buildGraph() {
+      const adj = {};
+      const indegree = {};
+
+      for (const task of tasks) {
+        adj[task] = [];
+        indegree[task] = 0;
+      }
+
+      for (const [from, to] of dependencies) {
+        if (!adj[from]) adj[from] = [];
+        if (indegree[to] === undefined) indegree[to] = 0;
+        adj[from].push(to);
+        indegree[to]++;
+      }
+
+      return { adj, indegree };
+    }
+
+    function topologicalSort() {
+      const { adj, indegree } = buildGraph();
+      const queue = [];
+
+      Object.keys(indegree).forEach((node) => {
+        if (indegree[node] === 0) queue.push(node);
+      });
+
+      queue.sort((a, b) => a.localeCompare(b));
+      const order = [];
+
+      while (queue.length > 0) {
+        const node = queue.shift();
+        order.push(node);
+
+        for (const neighbor of adj[node] || []) {
+          indegree[neighbor]--;
+          if (indegree[neighbor] === 0) {
+            queue.push(neighbor);
+            queue.sort((a, b) => a.localeCompare(b));
+          }
+        }
+      }
+
+      return order.length === tasks.size ? order : null;
+    }
+
+    function findCycle() {
+      const { adj } = buildGraph();
+      const visited = new Set();
+      const inStack = new Set();
+      const parent = {};
+
+      function dfs(node) {
+        visited.add(node);
+        inStack.add(node);
+
+        for (const neighbor of adj[node] || []) {
+          if (!visited.has(neighbor)) {
+            parent[neighbor] = node;
+            const result = dfs(neighbor);
+            if (result) return result;
+          } else if (inStack.has(neighbor)) {
+            const cycle = [neighbor];
+            let current = node;
+
+            while (current !== neighbor && current !== undefined) {
+              cycle.push(current);
+              current = parent[current];
+            }
+
+            cycle.push(neighbor);
+            cycle.reverse();
+            return cycle;
+          }
+        }
+
+        inStack.delete(node);
+        return null;
+      }
+
+      for (const node of tasks) {
+        if (!visited.has(node)) {
+          const cycle = dfs(node);
+          if (cycle) return cycle;
+        }
+      }
+
+      return null;
+    }
+
+    function generatePlan() {
+      if (tasks.size === 0) {
+        alert("Please add tasks first.");
+        return;
+      }
+
+      const order = topologicalSort();
+      let text = "";
+      text += "================================================\n";
+      text += "TASK EXECUTION PLAN ANALYSIS\n";
+      text += "================================================\n";
+
+      if (order) {
+        text += "Status      : Valid dependency structure\n";
+        text += "Cycle Check : No cycle detected\n\n";
+        text += "Execution Order:\n";
+
+        order.forEach((task, i) => {
+          text += `${i + 1}. ${task}\n`;
+        });
+
+        text += "\nInterpretation:\n";
+        text += "The task dependency system forms a DAG.\n";
+        text += "Therefore, a valid topological ordering exists.";
+        outputBox.textContent = text;
+        setStatus("Valid DAG");
+      } else {
+        text += "Status      : Invalid dependency structure\n";
+        text += "Cycle Check : Cycle detected\n\n";
+        text += "A valid execution plan cannot be generated.\n";
+
+        const cycle = findCycle();
+        if (cycle) {
+          text += "\nCycle Path:\n";
+          for (let i = 0; i < cycle.length - 1; i++) {
+            text += `${cycle[i]} → ${cycle[i + 1]}\n`;
+          }
+        }
+
+        text += "\nPlease remove cyclic dependencies.";
+        outputBox.textContent = text;
+        setStatus("Cycle Found");
+      }
+    }
+
+    function clearAll() {
+      tasks.clear();
+      dependencies.length = 0;
+
+      taskInput.value = "";
+      fromTaskInput.value = "";
+      toTaskInput.value = "";
+
+      outputBox.textContent = "All data cleared.";
+      graphContainer.innerHTML = '<div class="graph-placeholder">Click "Visualize Graph" to display the dependency graph.</div>';
+      setStatus("Ready");
+      updateStatsAndLists();
+    }
+
+    function loadSampleData() {
+      tasks.clear();
+      dependencies.length = 0;
+
+      [
+        "Requirement Analysis",
+        "UI Design",
+        "Backend Development",
+        "Model Integration",
+        "Testing",
+        "Deployment"
+      ].forEach((task) => tasks.add(task));
+
+      [
+        ["Requirement Analysis", "UI Design"],
+        ["Requirement Analysis", "Backend Development"],
+        ["UI Design", "Model Integration"],
+        ["Backend Development", "Model Integration"],
+        ["Model Integration", "Testing"],
+        ["Testing", "Deployment"]
+      ].forEach((dep) => dependencies.push(dep));
+
+      outputBox.textContent = "Sample project data loaded.";
+      setStatus("Sample Loaded");
+      updateStatsAndLists();
+    }
+
+    function getLevels() {
+      const { adj, indegree } = buildGraph();
+      const queue = [];
+      const level = {};
+
+      Object.keys(indegree).forEach((node) => {
+        if (indegree[node] === 0) {
+          queue.push(node);
+          level[node] = 0;
+        }
+      });
+
+      while (queue.length > 0) {
+        const node = queue.shift();
+
+        for (const neighbor of adj[node] || []) {
+          indegree[neighbor]--;
+          level[neighbor] = Math.max(level[neighbor] ?? 0, level[node] + 1);
+          if (indegree[neighbor] === 0) queue.push(neighbor);
+        }
+      }
+
+      for (const task of tasks) {
+        if (level[task] === undefined) level[task] = 0;
+      }
+
+      return level;
+    }
+
+    function visualizeGraph() {
+      if (tasks.size === 0) {
+        alert("Please add tasks first.");
+        return;
+      }
+
+      const cycle = findCycle();
+      if (cycle) {
+        renderGraphCircular();
+      } else {
+        renderGraphLayered();
+      }
+    }
+
+    function renderGraphLayered() {
+      const levelMap = getLevels();
+      const grouped = {};
+
+      for (const task of tasks) {
+        const lvl = levelMap[task] || 0;
+        if (!grouped[lvl]) grouped[lvl] = [];
+        grouped[lvl].push(task);
+      }
+
+      Object.keys(grouped).forEach((key) => grouped[key].sort((a, b) => a.localeCompare(b)));
+
+      const positions = {};
+      const xGap = 220;
+      const yGap = 110;
+      const startX = 120;
+      const startY = 80;
+
+      Object.keys(grouped).forEach((level) => {
+        grouped[level].forEach((task, index) => {
+          positions[task] = {
+            x: startX + Number(level) * xGap,
+            y: startY + index * yGap
+          };
+        });
+      });
+
+      renderSVG(positions);
+    }
+
+    function renderGraphCircular() {
+      const taskArray = Array.from(tasks).sort((a, b) => a.localeCompare(b));
+      const positions = {};
+      const cx = 450;
+      const cy = 210;
+      const radius = 150;
+
+      taskArray.forEach((task, i) => {
+        const angle = (2 * Math.PI * i) / taskArray.length;
+        positions[task] = {
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle)
+        };
+      });
+
+      renderSVG(positions);
+    }
+
+    function renderSVG(positions) {
+      let svg = `
+        <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"></polygon>
+            </marker>
+          </defs>
+      `;
+
+      for (const [from, to] of dependencies) {
+        const p1 = positions[from];
+        const p2 = positions[to];
+        if (!p1 || !p2) continue;
+
+        svg += `<line class="edge-line" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"></line>`;
+      }
+
+      for (const task of Object.keys(positions)) {
+        const { x, y } = positions[task];
+        svg += `<circle class="node-circle" cx="${x}" cy="${y}" r="38"></circle>`;
+        svg += `<text class="node-text" x="${x}" y="${y}">${truncate(task, 12)}</text>`;
+      }
+
+      svg += `</svg>`;
+      graphContainer.innerHTML = svg;
+    }
+
+    function truncate(text, maxLength) {
+      return text.length > maxLength ? text.slice(0, maxLength - 2) + ".." : text;
+    }
+
+    function changeAppearanceMode() {
+      const mode = modeSelect.value;
+      if (mode === "light") {
+        document.body.classList.add("light");
+      } else {
+        document.body.classList.remove("light");
+      }
+    }
+
+    updateStatsAndLists();
+  </script>
+</body>
+</html>
